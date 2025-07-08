@@ -1,8 +1,167 @@
 import React, { useState, useEffect } from 'react';
-import { Search, CreditCard, CheckCircle, Clock, AlertCircle, DollarSign, Eye, ArrowLeft, Calendar, Receipt } from 'lucide-react';
+import { Search, CreditCard, CheckCircle, Clock, AlertCircle, DollarSign, Eye, ArrowLeft, Calendar, Receipt, CreditCard as PayIcon } from 'lucide-react';
 import { creditsAPI } from '../services/api';
 import { formatPrice } from '../utils/priceFormatter';
 import toast from 'react-hot-toast';
+
+const BulkPaymentModal = ({ credits, customerName, onClose, onSuccess }) => {
+  const [amount, setAmount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const totalRemaining = credits.reduce((sum, credit) => sum + parseFloat(credit.remaining || 0), 0);
+  const paymentAmount = parseFloat(amount) || 0;
+  const newRemainingAmount = Math.max(0, totalRemaining - paymentAmount);
+  const isValidPayment = paymentAmount > 0 && paymentAmount <= totalRemaining;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isValidPayment) {
+      toast.error('Please enter a valid payment amount.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Apply payments to credits in order (oldest first)
+      let remainingPayment = paymentAmount;
+      const sortedCredits = [...credits].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      
+      for (const credit of sortedCredits) {
+        if (remainingPayment <= 0) break;
+        
+        const creditRemaining = parseFloat(credit.remaining || 0);
+        if (creditRemaining <= 0) continue;
+        
+        const paymentForThisCredit = Math.min(remainingPayment, creditRemaining);
+        
+        await creditsAPI.makePayment(credit.id, { amount_paid: paymentForThisCredit });
+        remainingPayment -= paymentForThisCredit;
+      }
+      
+      toast.success('Bulk payment recorded successfully!');
+      onSuccess();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to record payment.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-lg p-6 w-96 max-w-md mx-4">
+        <h3 className="text-xl font-semibold mb-4 text-gray-900">Bulk Payment</h3>
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Customer:</span>
+              <span className="font-medium text-gray-900">{customerName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Total Credits:</span>
+              <span className="font-medium text-gray-900">{credits.length}</span>
+            </div>
+            <div className="flex justify-between pt-2 border-t border-gray-200">
+              <span className="text-gray-900 font-medium">Total Remaining:</span>
+              <span className="font-bold text-red-600">{formatPrice(totalRemaining)}</span>
+            </div>
+            {paymentAmount > 0 && (
+              <>
+                <div className="flex justify-between pt-2 border-t border-gray-200">
+                  <span className="text-gray-600">Payment Amount:</span>
+                  <span className={`font-medium ${isValidPayment ? 'text-blue-600' : 'text-red-600'}`}>
+                    -{formatPrice(paymentAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-900 font-medium">New Remaining:</span>
+                  <span className={`font-bold ${newRemainingAmount === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatPrice(newRemainingAmount)}
+                  </span>
+                </div>
+                {newRemainingAmount === 0 && (
+                  <div className="text-center mt-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      ✓ All credits will be fully paid
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Amount</label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${
+                  amount && !isValidPayment 
+                    ? 'border-red-300 focus:ring-red-500 bg-red-50' 
+                    : 'border-gray-300 focus:ring-green-500'
+                }`}
+                placeholder="Enter amount"
+                autoFocus
+                step="0.01"
+                max={totalRemaining}
+              />
+            </div>
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-xs text-gray-500">Maximum: {formatPrice(totalRemaining)}</p>
+              {amount && !isValidPayment && (
+                <p className="text-xs text-red-600">Invalid amount</p>
+              )}
+            </div>
+            {/* Quick payment buttons */}
+            <div className="flex space-x-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setAmount((totalRemaining / 4).toString())}
+                className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                25%
+              </button>
+              <button
+                type="button"
+                onClick={() => setAmount((totalRemaining / 2).toString())}
+                className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                50%
+              </button>
+              <button
+                type="button"
+                onClick={() => setAmount(totalRemaining.toString())}
+                className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Full
+              </button>
+            </div>
+          </div>
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !isValidPayment}
+              className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors font-medium"
+            >
+              {isSubmitting ? 'Processing...' : 'Record Payment'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 const PaymentModal = ({ credit, onClose, onSuccess }) => {
   const [amount, setAmount] = useState('');
@@ -156,6 +315,7 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
   const [credits, setCredits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCredit, setSelectedCredit] = useState(null);
+  const [showBulkPayment, setShowBulkPayment] = useState(false);
 
   useEffect(() => {
     fetchCustomerCredits();
@@ -165,7 +325,9 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
     try {
       setLoading(true);
       const response = await creditsAPI.getByCustomer(customerName);
-      setCredits(response.data);
+      // Filter to show only unpaid credits
+      const unpaidCredits = response.data.filter(credit => parseFloat(credit.remaining || 0) > 0);
+      setCredits(unpaidCredits);
     } catch (error) {
       console.error('Error fetching customer credits:', error);
       toast.error('Failed to fetch customer credits');
@@ -176,6 +338,7 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
 
   const handlePaymentSuccess = () => {
     setSelectedCredit(null);
+    setShowBulkPayment(false);
     fetchCustomerCredits();
     onPaymentSuccess();
   };
@@ -293,7 +456,7 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
                   ) : credits.length === 0 ? (
                     <tr>
                       <td colSpan="7" className="py-8 text-center text-gray-500">
-                        No credit records found
+                        No unpaid credit records found
                       </td>
                     </tr>
                   ) : (
@@ -336,14 +499,12 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          {credit.remaining > 0 && (
-                            <button
-                              onClick={() => setSelectedCredit(credit)}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-sm hover:bg-blue-50 px-2 py-1 rounded transition-colors"
-                            >
-                              Pay
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setSelectedCredit(credit)}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                          >
+                            Pay
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -351,6 +512,29 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
                 </tbody>
               </table>
             </div>
+            
+            {/* Bulk Payment Button */}
+            {credits.length > 0 && totals.unpaidBalance > 0 && (
+              <div className="border-t border-gray-200 p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      Total unpaid balance: <span className="font-semibold text-red-600">{formatPrice(totals.unpaidBalance)}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {credits.length} unpaid credit record{credits.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowBulkPayment(true)}
+                    className="inline-flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    <PayIcon className="w-4 h-4" />
+                    <span>Bulk Pay</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -359,6 +543,15 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
         <PaymentModal
           credit={selectedCredit}
           onClose={() => setSelectedCredit(null)}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      {showBulkPayment && (
+        <BulkPaymentModal
+          credits={credits}
+          customerName={customerName}
+          onClose={() => setShowBulkPayment(false)}
           onSuccess={handlePaymentSuccess}
         />
       )}
