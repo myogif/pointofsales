@@ -6,11 +6,12 @@ import CartItem from './CartItem';
 import AddManualItemForm from './AddManualItemForm';
 import toast from 'react-hot-toast';
 import { salesAPI } from '../services/api';
+import CreateCreditModal from './CreateCreditModal'; // Import the modal
 
 const CartSidebar = () => {
   const { items, clearCart, getCartTotal, getTotalItems } = useCartStore();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState('cart'); // 'cart', 'payment'
+  const [showCreditModal, setShowCreditModal] = useState(false); // State to control modal visibility
 
   const handleProcessPayment = async () => {
     if (items.length === 0) {
@@ -42,39 +43,17 @@ const CartSidebar = () => {
     }
   };
 
-  const handleSaveAsCredit = async () => {
+  const handleSaveAsCredit = () => {
     if (items.length === 0) {
       toast.error('Cart is empty');
       return;
     }
+    setShowCreditModal(true);
+  };
 
-    const customerName = prompt("Enter customer name for credit sale:");
-    if (!customerName) {
-      toast.error("Customer name is required to save as credit.");
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      await salesAPI.createCredit({
-        items: items.map(item => ({
-          id: item.id,
-          quantity: item.quantity,
-          price: item.price_pcs,
-          total: item.price_pcs * item.quantity,
-          selectedUnit: 'pcs'
-        })),
-        customer_name: customerName,
-        total: getCartTotal(),
-      });
-      toast.success(`Order saved as credit for ${customerName}!`);
-      clearCart();
-    } catch (error) {
-      console.error('Failed to save as credit:', error);
-      toast.error('Failed to save as credit. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
+  const handleCreditSuccess = () => {
+    clearCart();
+    setShowCreditModal(false);
   };
 
   const subtotal = getCartTotal();
@@ -128,7 +107,7 @@ const CartSidebar = () => {
             {isProcessing ? (
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
             ) : (
-              'Proceed to Payment'
+            'Proceed to Payment'
             )}
           </button>
           <button
@@ -148,6 +127,14 @@ const CartSidebar = () => {
           )}
         </div>
       </footer>
+
+      {showCreditModal && (
+        <CreateCreditModal
+          onClose={() => setShowCreditModal(false)}
+          onSuccess={handleCreditSuccess}
+          cartTotal={getCartTotal()}
+        />
+      )}
     </div>
   );
 };

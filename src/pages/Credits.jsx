@@ -1,243 +1,10 @@
-<<<<<<< Updated upstream
-import React, { useState, useEffect } from 'react';
-import { Search, CreditCard, CheckCircle, Clock, AlertCircle, DollarSign, Eye, ArrowLeft, Calendar, Receipt, CreditCard as PayIcon } from 'lucide-react';
-import { creditsAPI } from '../services/api';
-import { formatPrice } from '../utils/priceFormatter';
-import toast from 'react-hot-toast';
-
-const BulkPaymentModal = ({ credits, customerName, onClose, onSuccess }) => {
-  const [amount, setAmount] = useState('');
-=======
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, CreditCard, CheckCircle, Clock, AlertCircle, DollarSign, Eye, ArrowLeft, Calendar, Receipt, CreditCard as PayIcon, PlusCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { creditsAPI, customersAPI } from '../services/api';
 import { formatPrice } from '../utils/priceFormatter';
 import toast from 'react-hot-toast';
 
-const CreateCreditModal = ({ onClose, onSuccess }) => {
-  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [amountOwed, setAmountOwed] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [description, setDescription] = useState('');
-  const [type, setType] = useState('general_credit');
->>>>>>> Stashed changes
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customers, setCustomers] = useState([]);
-  const [loadingCustomers, setLoadingCustomers] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-
-<<<<<<< Updated upstream
-  const totalRemaining = credits.reduce((sum, credit) => sum + parseFloat(credit.remaining || 0), 0);
-  const paymentAmount = parseFloat(amount) || 0;
-  const newRemainingAmount = Math.max(0, totalRemaining - paymentAmount);
-  const isValidPayment = paymentAmount > 0 && paymentAmount <= totalRemaining;
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!isValidPayment) {
-      toast.error('Please enter a valid payment amount.');
-=======
-  const fetchCustomers = useCallback(async () => {
-    setLoadingCustomers(true);
-    try {
-      const response = await customersAPI.getAll({
-        search: customerSearchTerm,
-        page: currentPage,
-        limit: 5,
-      });
-      setCustomers(response.data.data || response.data);
-      if (response.data.pagination) {
-        setTotalPages(response.data.pagination.totalPages || 1);
-      } else {
-        setTotalPages(1);
-      }
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-      toast.error('Failed to load customers.');
-    } finally {
-      setLoadingCustomers(false);
-    }
-  }, [customerSearchTerm, currentPage]);
-
-  useEffect(() => {
-    const debounceFetch = setTimeout(() => {
-      fetchCustomers();
-    }, 300); // Debounce search
-    return () => clearTimeout(debounceFetch);
-  }, [fetchCustomers]);
-
-  const handleCustomerSelect = (customer) => {
-    setSelectedCustomer(customer);
-    setCustomerSearchTerm(customer.name);
-  };
-
-  const handlePageChange = (newPage) => {
-    if (newPage > 0 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!selectedCustomer || !selectedCustomer.id) {
-      toast.error('Please select a valid customer.');
->>>>>>> Stashed changes
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-<<<<<<< Updated upstream
-=======
-      await creditsAPI.createCredit({
-        customer_id: selectedCustomer.id,
-        customer_name: selectedCustomer.name,
-        amount_owed: parseFloat(amountOwed),
-        due_date: dueDate || null,
-        description: description || null,
-        type,
-      });
-      toast.success('Credit created successfully!');
-      onSuccess();
-      onClose();
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to create credit.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md mx-4">
-        <h3 className="text-xl font-semibold mb-4 text-gray-900">Create New Credit</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                value={customerSearchTerm}
-                onChange={(e) => {
-                  setCustomerSearchTerm(e.target.value);
-                  setCurrentPage(1); // Reset to page 1 on new search
-                }}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="Enter customer name to search"
-              />
-            </div>
-            <div className="mt-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
-              {loadingCustomers ? (
-                <div className="p-2 text-sm text-gray-500 flex items-center justify-center">
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...
-                </div>
-              ) : customers.length === 0 ? (
-                <div className="p-2 text-sm text-gray-500">No customers found.</div>
-              ) : (
-                customers.map((customer) => (
-                  <button
-                    key={customer.id}
-                    type="button"
-                    onClick={() => handleCustomerSelect(customer)}
-                    className={`w-full p-2 text-left text-sm border-b border-gray-200 hover:bg-gray-100 ${
-                      selectedCustomer && selectedCustomer.id === customer.id
-                        ? 'bg-green-50 text-green-700 font-medium'
-                        : ''
-                    }`}
-                  >
-                    {customer.name} {customer.phone && `(${customer.phone})`}
-                  </button>
-                ))
-              )}
-            </div>
-            {totalPages > 1 && (
-              <div className="mt-2 flex items-center justify-between text-sm text-gray-600">
-                <button
-                  type="button"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            {selectedCustomer && (
-              <div className="mt-4 p-3 border border-green-300 rounded-lg bg-green-50 text-green-900 font-medium">
-                Selected: {selectedCustomer.name}
-              </div>
-            )}
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Amount Owed</label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="number"
-                value={amountOwed}
-                onChange={(e) => setAmountOwed(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="Enter amount"
-                step="0.01"
-                required
-              />
-            </div>
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date (Optional)</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows="3"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="e.g., Reason for credit, specific items"
-            ></textarea>
-          </div>
-          <div className="flex space-x-3 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors font-medium"
-            >
-              {isSubmitting ? 'Creating...' : 'Create Credit'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+import CreateCreditModal from '../components/CreateCreditModal';
 
 const BulkPaymentModal = ({ credits, customerName, onClose, onSuccess }) => {
   const [amount, setAmount] = useState('');
@@ -257,7 +24,6 @@ const BulkPaymentModal = ({ credits, customerName, onClose, onSuccess }) => {
 
     setIsSubmitting(true);
     try {
->>>>>>> Stashed changes
       // Apply payments to credits in order (oldest first)
       let remainingPayment = paymentAmount;
       const sortedCredits = [...credits].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -552,17 +318,6 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
   const [loading, setLoading] = useState(true);
   const [selectedCredit, setSelectedCredit] = useState(null);
   const [showBulkPayment, setShowBulkPayment] = useState(false);
-<<<<<<< Updated upstream
-
-  useEffect(() => {
-    fetchCustomerCredits();
-  }, [customerName]);
-
-  const fetchCustomerCredits = async () => {
-    try {
-      setLoading(true);
-      const response = await creditsAPI.getByCustomer(customerName);
-=======
   const [creditTypeFilter, setCreditTypeFilter] = useState(''); // 'sale_credit', 'general_credit', or '' for all
 
   useEffect(() => {
@@ -576,22 +331,16 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
       setLoading(true);
       const params = creditTypeFilter ? { type: creditTypeFilter } : {};
       const response = await creditsAPI.getByCustomer(customerName, { ...params, signal });
->>>>>>> Stashed changes
       // Filter to show only unpaid credits
       const unpaidCredits = response.data.filter(credit => parseFloat(credit.remaining || 0) > 0);
       setCredits(unpaidCredits);
     } catch (error) {
-<<<<<<< Updated upstream
-      console.error('Error fetching customer credits:', error);
-      toast.error('Failed to fetch customer credits');
-=======
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED' || error.message === 'canceled') {
         console.log('Fetch customer credits aborted:', error.message);
       } else {
         console.error('Error fetching customer credits:', error);
         toast.error('Failed to fetch customer credits');
       }
->>>>>>> Stashed changes
     } finally {
       setLoading(false);
     }
@@ -692,8 +441,6 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
             </div>
           </div>
 
-<<<<<<< Updated upstream
-=======
           {/* Credit Type Filter */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Credit Type</label>
@@ -708,7 +455,6 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
             </select>
           </div>
 
->>>>>>> Stashed changes
           {/* Credits Table */}
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto max-h-96">
@@ -716,11 +462,8 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
                 <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                   <tr>
                     <th className="text-left py-3 px-4 font-semibold text-gray-900">Date</th>
-<<<<<<< Updated upstream
-=======
                     <th className="text-left py-3 px-4 font-semibold text-gray-900">Type</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-900">Details</th>
->>>>>>> Stashed changes
                     <th className="text-left py-3 px-4 font-semibold text-gray-900">Amount Owed</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-900">Due Date</th>
@@ -732,23 +475,14 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
                 <tbody className="divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-<<<<<<< Updated upstream
-                      <td colSpan="7" className="py-8 text-center">
-=======
                       <td colSpan="9" className="py-8 text-center">
->>>>>>> Stashed changes
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
                       </td>
                     </tr>
                   ) : credits.length === 0 ? (
                     <tr>
-<<<<<<< Updated upstream
-                      <td colSpan="7" className="py-8 text-center text-gray-500">
-                        No unpaid credit records found
-=======
                       <td colSpan="9" className="py-8 text-center text-gray-500">
                         No unpaid credit records found for the selected type
->>>>>>> Stashed changes
                       </td>
                     </tr>
                   ) : (
@@ -760,8 +494,6 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
                           </span>
                         </td>
                         <td className="py-3 px-4">
-<<<<<<< Updated upstream
-=======
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${credit.type === 'sale_credit' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
                             {credit.type.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                           </span>
@@ -780,7 +512,6 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
                           )}
                         </td>
                         <td className="py-3 px-4">
->>>>>>> Stashed changes
                           <span className="font-semibold text-gray-900">
                             {formatPrice(credit.amount_owed)}
                           </span>
@@ -874,46 +605,11 @@ const CustomerDetailModal = ({ customerName, onClose, onPaymentSuccess }) => {
 
 const Credits = () => {
   const [searchTerm, setSearchTerm] = useState('');
-<<<<<<< Updated upstream
-=======
   const [tempSearchTerm, setTempSearchTerm] = useState(''); // For controlled search input
->>>>>>> Stashed changes
   const [customers, setCustomers] = useState([]);
   const [totalOutstanding, setTotalOutstanding] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-<<<<<<< Updated upstream
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [customersResponse, totalResponse] = await Promise.all([
-        creditsAPI.getAll(),
-        creditsAPI.getTotalOutstanding()
-      ]);
-      
-      setCustomers(customersResponse.data);
-      setTotalOutstanding(totalResponse.data.total_outstanding);
-    } catch (error) {
-      console.error('Error fetching credits data:', error);
-      toast.error('Failed to fetch credits data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePaymentSuccess = () => {
-    fetchData();
-  };
-
-  const filteredCustomers = customers.filter(customer =>
-    customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-=======
   const [showCreateCreditModal, setShowCreateCreditModal] = useState(false);
   const [pagination, setPagination] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -967,7 +663,6 @@ const Credits = () => {
   const handlePaymentSuccess = () => {
     fetchData(currentPage, searchTerm); // Re-fetch data after payment success
   };
->>>>>>> Stashed changes
 
   if (loading) {
     return (
@@ -989,32 +684,6 @@ const Credits = () => {
             <p className="text-gray-600">Track and manage customer credit accounts</p>
           </div>
           
-<<<<<<< Updated upstream
-          {/* Total Outstanding Badge */}
-          <div className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl shadow-lg">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-sm font-medium opacity-90">Total Outstanding Credits</p>
-                <p className="text-2xl font-bold">{formatPrice(totalOutstanding)}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Search by customer name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-=======
           <div className="flex items-center space-x-4">
             {/* Total Outstanding Badge */}
             <div className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl shadow-lg">
@@ -1037,7 +706,6 @@ const Credits = () => {
               <span>New Credit</span>
             </button>
           </div>
->>>>>>> Stashed changes
         </div>
 
         {/* Search */}
@@ -1076,11 +744,7 @@ const Credits = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-<<<<<<< Updated upstream
-              {filteredCustomers.length === 0 ? (
-=======
               {customers.length === 0 ? (
->>>>>>> Stashed changes
                 <tr>
                   <td colSpan="6" className="py-12 text-center">
                     <div className="text-gray-400 mb-4">
@@ -1095,11 +759,7 @@ const Credits = () => {
                   </td>
                 </tr>
               ) : (
-<<<<<<< Updated upstream
-                filteredCustomers.map(customer => (
-=======
                 customers.map(customer => (
->>>>>>> Stashed changes
                   <tr key={customer.customer_name} className="hover:bg-gray-50">
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-3">
@@ -1177,8 +837,6 @@ const Credits = () => {
           customerName={selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
           onPaymentSuccess={handlePaymentSuccess}
-<<<<<<< Updated upstream
-=======
         />
       )}
 
@@ -1186,7 +844,6 @@ const Credits = () => {
         <CreateCreditModal
           onClose={() => setShowCreateCreditModal(false)}
           onSuccess={handlePaymentSuccess} // Re-fetch data after new credit is created
->>>>>>> Stashed changes
         />
       )}
     </div>

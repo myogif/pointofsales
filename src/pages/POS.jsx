@@ -64,7 +64,7 @@ const POS = () => {
     fetchProducts(1, selectedCategory, searchTerm);
   };
 
-  const handleBarcodeScan = async (barcode) => {
+  const handleBarcodeScan = useCallback(async (barcode) => {
     setIsScannerOpen(false);
     try {
       const response = await productsAPI.getAll({ search: barcode, limit: 1 });
@@ -78,22 +78,22 @@ const POS = () => {
       console.error('Error finding product by barcode:', error);
       toast.error('Error finding product.');
     }
-  };
+  }, [addToCart]);
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
       <Sidebar />
-      <div className="flex-1 flex flex-col h-screen">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <button onClick={toggleSidebar} className="text-gray-500 mr-4 lg:hidden">
                 <Menu className="w-6 h-6" />
               </button>
-              <h1 className="text-xl font-bold text-gray-800">Point of Sale</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-800">Point of Sale</h1>
             </div>
-            <div className="flex-1 max-w-lg mx-6">
+            <div className="flex-1 max-w-xs sm:max-w-sm md:max-w-md mx-4">
               <form onSubmit={handleSearchSubmit}>
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -102,12 +102,19 @@ const POS = () => {
                     placeholder="Search products..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 pr-4 py-2.5 text-sm border border-gray-200 bg-gray-50 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-12 pr-12 py-2.5 text-sm border border-gray-200 bg-gray-50 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </button>
                 </div>
               </form>
             </div>
-            <p className="text-sm text-gray-500">Toko Kelontong Bahagia</p>
+            <p className="hidden md:block text-sm text-gray-500">Toko Kelontong Bahagia</p>
           </div>
         </header>
 
@@ -116,7 +123,7 @@ const POS = () => {
           <div className="flex-1 flex flex-col overflow-y-auto">
             {/* Categories */}
             <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
-              <div className="px-6 py-3">
+              <div className="px-4 sm:px-6 py-3 overflow-x-auto">
                 <div className="flex space-x-2">
                   {categories.map((cat) => (
                     <button
@@ -139,20 +146,13 @@ const POS = () => {
             </nav>
 
             {/* Product Grid */}
-            <main className="flex-1 p-6">
+            <main className="flex-1 p-4 sm:p-6">
               {loading ? (
                 <div className="flex justify-center items-center h-full">
                   <div className="animate-spin rounded-full h-24 w-24 border-t-2 border-b-2 border-blue-600"></div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                  <div
-                    className="bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center text-center p-4 cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => setIsScannerOpen(true)}
-                  >
-                    <Camera className="w-10 h-10 text-blue-500 mb-2" />
-                    <h3 className="font-semibold text-sm text-blue-800">Scan Barcode</h3>
-                  </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
                   {products.map((product) => (
                     <ProductCard key={product.id} product={product} />
                   ))}
@@ -160,11 +160,11 @@ const POS = () => {
               )}
 
               {pagination && products.length > 0 && (
-                <div className="flex items-center justify-center mt-8">
+                <div className="flex items-center justify-center mt-6 sm:mt-8">
                   <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 mx-1 rounded-md bg-white border border-gray-300 disabled:opacity-50">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
-                  <span className="text-sm text-gray-700 mx-4">
+                  <span className="text-sm text-gray-700 mx-2 sm:mx-4">
                     Page {pagination.page} of {pagination.totalPages}
                   </span>
                   <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === pagination.totalPages} className="p-2 mx-1 rounded-md bg-white border border-gray-300 disabled:opacity-50">
@@ -176,7 +176,7 @@ const POS = () => {
           </div>
 
           {/* Cart Sidebar */}
-          <div className="w-full md:w-[400px] bg-white border-l border-gray-200 flex flex-col">
+          <div className="w-full lg:w-[380px] xl:w-[420px] bg-white border-l border-gray-200 flex-col absolute lg:relative inset-y-0 right-0 transform transition-transform duration-300 ease-in-out translate-x-full lg:translate-x-0">
             <CartSidebar />
           </div>
         </div>
@@ -192,10 +192,12 @@ const POS = () => {
               </button>
             </div>
             <div className="flex-grow p-4">
-              <BarcodeScanner
-                onScan={handleBarcodeScan}
-                onClose={() => setIsScannerOpen(false)}
-              />
+              {isScannerOpen && (
+                <BarcodeScanner
+                  onScan={handleBarcodeScan}
+                  onClose={() => setIsScannerOpen(false)}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -260,10 +260,7 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
-<<<<<<< Updated upstream
-=======
   const [totalCreditToday, setTotalCreditToday] = useState(0);
->>>>>>> Stashed changes
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -353,12 +350,8 @@ const Transactions = () => {
     total: transactions.length,
     totalAmount: transactions.reduce((sum, tx) => sum + parseFloat(tx.total), 0),
     completed: transactions.filter(tx => tx.status === 'completed').length,
-<<<<<<< Updated upstream
-    pending: transactions.filter(tx => tx.status === 'pending').length,
-=======
     // The "pending" stat will now represent "Total Credit Today"
     totalCreditToday: totalCreditToday, 
->>>>>>> Stashed changes
   };
 
   if (loading) {
@@ -419,21 +412,12 @@ const Transactions = () => {
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center space-x-4">
-<<<<<<< Updated upstream
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900">{stats.pending}</h3>
-              <p className="text-sm text-gray-600">Pending</p>
-=======
             <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
               <CreditCard className="w-6 h-6 text-red-600" />
             </div>
             <div>
               <h3 className="text-2xl font-bold text-gray-900">{formatPrice(stats.totalCreditToday)}</h3>
               <p className="text-sm text-gray-600">Total Credit Today</p>
->>>>>>> Stashed changes
             </div>
           </div>
         </div>

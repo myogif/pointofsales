@@ -32,9 +32,9 @@ const CartItem = ({ item }) => {
         alt={item.name}
         className="w-16 h-16 object-cover rounded-lg"
       />
-      <div className="flex-1">
-        <h4 className="font-semibold text-md text-gray-800">{item.name}</h4>
-        <div className="flex items-center space-x-2 mt-1">
+      <div className="flex-1 min-w-0">
+        <h4 className="font-semibold text-md text-gray-800 truncate">{item.name}</h4>
+        <div className="flex flex-wrap items-center gap-2 mt-1">
           <input
             type="number"
             value={price}

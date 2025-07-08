@@ -12,10 +12,7 @@ import { authenticateToken } from '../middlewares/auth.js';
 const router = express.Router();
 
 router.get('/', authenticateToken, getAllCredits);
-<<<<<<< Updated upstream
-=======
-router.post('/', authenticateToken, createCredit); // New route for creating credits
->>>>>>> Stashed changes
+router.post('/', authenticateToken, createCredit);
 router.get('/total-outstanding', authenticateToken, getTotalOutstanding);
 router.get('/customer/:customer_name', authenticateToken, getCreditsByCustomer);
 router.post('/pay/:id', authenticateToken, makePayment);

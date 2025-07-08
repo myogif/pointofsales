@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Upload, Image as ImageIcon, Camera } from 'lucide-react';
+import BarcodeScanner from './BarcodeScanner';
 import { productsAPI, categoriesAPI, uploadAPI } from '../services/api';
 import { formatPrice } from '../utils/priceFormatter';
 import toast from 'react-hot-toast';
@@ -20,6 +21,7 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -176,62 +178,77 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
     });
   };
 
+  const handleScan = (scannedBarcode) => {
+    setFormData(prev => ({ ...prev, barcode: scannedBarcode }));
+    setIsScannerOpen(false);
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {product ? 'Edit Product' : 'Add New Product'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {product ? 'Edit Product' : 'Add New Product'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Basic Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Basic Information</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Enter product name"
-                  required
-                />
-              </div>
+          <form onSubmit={handleSubmit} className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Basic Information</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Product Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Enter product name"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Barcode *
-                </label>
-                <input
-                  type="text"
-                  name="barcode"
-                  value={formData.barcode}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Enter barcode"
-                  required
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Barcode *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      name="barcode"
+                      value={formData.barcode}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder="Enter barcode"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsScannerOpen(true)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-green-600"
+                    >
+                      <Camera className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category *
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category *
                 </label>
                 <select
                   name="category_id"
@@ -432,6 +449,22 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
         </form>
       </div>
     </div>
+
+    {isScannerOpen && (
+      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100]">
+        <div className="bg-white rounded-lg w-full max-w-md mx-auto p-4 relative">
+          <h3 className="text-lg font-semibold mb-4">Scan Barcode</h3>
+          <button
+            onClick={() => setIsScannerOpen(false)}
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <BarcodeScanner onScan={handleScan} onClose={() => setIsScannerOpen(false)} />
+        </div>
+      </div>
+    )}
+  </>
   );
 };
 

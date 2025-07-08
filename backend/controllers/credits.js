@@ -7,15 +7,10 @@ export const getAllCredits = async (req, res) => {
     const parsedLimit = parseInt(limit, 10);
     const offset = (parsedPage - 1) * parsedLimit;
 
-<<<<<<< Updated upstream
-    // Get all credits with calculated total_paid from credit_payments
-    let query = supabase.from('credits').select(`
-=======
     // Fetch all credits first to perform in-memory grouping and filtering
     // This approach is necessary because Supabase's RLS and complex aggregations
     // are often easier to handle in application logic for custom grouping.
     let creditsQuery = supabase.from('credits').select(`
->>>>>>> Stashed changes
       *,
       sales (
         id,
@@ -76,20 +71,13 @@ export const getAllCredits = async (req, res) => {
     }
 
     // Calculate remaining and filter out customers with zero remaining
-<<<<<<< Updated upstream
-    const filteredCustomers = Object.values(customerCredits)
-=======
     let processedCustomers = Object.values(customerCredits)
->>>>>>> Stashed changes
       .map(customer => ({
         ...customer,
         remaining: customer.total_owed - customer.total_paid
       }))
       .filter(customer => customer.remaining > 0);
 
-<<<<<<< Updated upstream
-    res.json(filteredCustomers);
-=======
     // Apply search filter
     if (search) {
       const searchTermLower = search.toLowerCase();
@@ -115,32 +103,24 @@ export const getAllCredits = async (req, res) => {
         limit: parsedLimit,
       },
     });
->>>>>>> Stashed changes
   } catch (error) {
     console.error('Error fetching credits:', error);
     res.status(500).json({ error: 'Failed to fetch credits' });
   }
 };
 
-<<<<<<< Updated upstream
-export const getTotalOutstanding = async (req, res) => {
-  try {
-    // Get all credits
-    const { data: credits, error } = await supabase
-      .from('credits')
-      .select('id, amount_owed');
-=======
 export const createCredit = async (req, res) => {
   try {
-    const { customer_name, amount_owed, due_date, description, type } = req.body;
+    const { customer_id, customer_name, amount_owed, due_date, description, type } = req.body;
 
-    if (!customer_name || !amount_owed || isNaN(amount_owed) || amount_owed <= 0) {
-      return res.status(400).json({ error: 'Customer name and a valid amount owed are required.' });
+    if (!customer_id || !customer_name || !amount_owed || isNaN(amount_owed) || amount_owed <= 0) {
+      return res.status(400).json({ error: 'Customer ID, name, and a valid amount are required.' });
     }
 
     const { data, error } = await supabase
       .from('credits')
       .insert([{
+        customer_id,
         customer_name,
         amount_owed: parseFloat(amount_owed),
         due_date: due_date || null,
@@ -172,7 +152,6 @@ export const getTotalOutstanding = async (req, res) => {
     }
 
     const { data: credits, error } = await query;
->>>>>>> Stashed changes
 
     if (error) throw error;
 
@@ -203,14 +182,9 @@ export const getTotalOutstanding = async (req, res) => {
 export const getCreditsByCustomer = async (req, res) => {
   try {
     const { customer_name } = req.params;
-<<<<<<< Updated upstream
-    
-    const { data: credits, error } = await supabase
-=======
     const { type } = req.query; // Added type filter
 
     let query = supabase
->>>>>>> Stashed changes
       .from('credits')
       .select(`
         *,
@@ -223,10 +197,6 @@ export const getCreditsByCustomer = async (req, res) => {
           )
         )
       `)
-<<<<<<< Updated upstream
-      .eq('customer_name', customer_name)
-      .order('created_at', { ascending: false });
-=======
       .eq('customer_name', customer_name);
     
     if (type) {
@@ -234,7 +204,6 @@ export const getCreditsByCustomer = async (req, res) => {
     }
 
     const { data: credits, error } = await query.order('created_at', { ascending: false });
->>>>>>> Stashed changes
 
     if (error) throw error;
 
