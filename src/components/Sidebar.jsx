@@ -5,12 +5,13 @@ import {
   ShoppingCart, 
   Package, 
   Users, 
-  CreditCard, 
-  BarChart3, 
+  CreditCard,
+  BarChart3,
   Settings,
   ShoppingBag,
   Leaf,
-  LogOut
+  LogOut,
+  List,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,6 +26,7 @@ const Sidebar = () => {
     { icon: Leaf, label: 'Categories', path: '/categories' },
     { icon: Users, label: 'Customers', path: '/customers' },
     { icon: CreditCard, label: 'Credit', path: '/credit' },
+    { icon: List, label: 'Transactions', path: '/transactions' },
     { icon: BarChart3, label: 'Reports', path: '/reports' },
     { icon: Settings, label: 'Settings', path: '/settings' }
   ];

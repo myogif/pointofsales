@@ -2,14 +2,29 @@ import { supabase } from '../services/supabaseClient.js';
 
 export const getAllCategories = async (req, res) => {
   try {
-    const { data: categories, error } = await supabase
+    const { page = 1, limit = 10 } = req.query;
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
+
+    const { data: categories, error, count } = await supabase
       .from('categories')
-      .select('*')
-      .order('name');
+      .select('*', { count: 'exact' })
+      .order('name')
+      .range(from, to);
 
     if (error) throw error;
 
-    res.json(categories);
+    res.json({
+      data: categories,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: count,
+        totalPages: Math.ceil(count / limitNum),
+      },
+    });
   } catch (error) {
     console.error('Error fetching categories:', error);
     res.status(500).json({ error: 'Failed to fetch categories' });

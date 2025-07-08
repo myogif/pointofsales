@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Leaf } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Edit, Trash2, Leaf, ChevronLeft, ChevronRight } from 'lucide-react';
 import { categoriesAPI } from '../services/api';
 import CategoryModal from '../components/CategoryModal';
 import toast from 'react-hot-toast';
@@ -9,23 +9,33 @@ const Categories = () => {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [pagination, setPagination] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async (page = 1) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await categoriesAPI.getAll();
-      setCategories(response.data);
+      const params = { page, limit: 10 };
+      const response = await categoriesAPI.getAll(params);
+      if (response && response.data) {
+        setCategories(response.data.data);
+        setPagination(response.data.pagination);
+      } else {
+        throw new Error('Invalid response format from categories API');
+      }
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast.error('Failed to fetch categories');
+      setCategories([]);
+      setPagination(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchCategories(currentPage);
+  }, [fetchCategories, currentPage]);
 
   const handleAddCategory = () => {
     setSelectedCategory(null);
@@ -51,7 +61,13 @@ const Categories = () => {
   };
 
   const handleModalSuccess = () => {
-    fetchCategories();
+    fetchCategories(currentPage);
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage > 0 && newPage <= pagination.totalPages) {
+      setCurrentPage(newPage);
+    }
   };
 
   if (loading) {
@@ -93,13 +109,13 @@ const Categories = () => {
         </div>
       </div>
 
-      {categories.length === 0 ? (
+      {categories.length === 0 && !loading ? (
         <div className="text-center py-12">
           <div className="text-gray-400 mb-4">
             <Leaf className="w-16 h-16 mx-auto" />
           </div>
           <p className="text-gray-600 mb-4">No categories found</p>
-          <button 
+          <button
             onClick={handleAddCategory}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 mx-auto"
           >
@@ -108,52 +124,74 @@ const Categories = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {categories.map(category => (
-            <div key={category.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div 
-                  className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg"
-                  style={{ backgroundColor: category.color }}
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {categories.map(category => (
+              <div key={category.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                    style={{ backgroundColor: category.color }}
+                  >
+                    {category.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleEditCategory(category)}
+                      className="text-blue-600 hover:text-blue-800 transition-colors p-1 rounded-md hover:bg-blue-50"
+                      title="Edit category"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(category.id)}
+                      className="text-red-600 hover:text-red-800 transition-colors p-1 rounded-md hover:bg-red-50"
+                      title="Delete category"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h3>
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: category.color }}
+                  ></div>
+                  <span>{category.color}</span>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
+                    Created {new Date(category.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {pagination && pagination.total > 0 && (
+            <div className="flex items-center justify-between mt-6">
+              <span className="text-sm text-gray-700">
+                Page {pagination.page} of {pagination.totalPages} (Total: {pagination.total} items)
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {category.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button 
-                    onClick={() => handleEditCategory(category)}
-                    className="text-blue-600 hover:text-blue-800 transition-colors p-1 rounded-md hover:bg-blue-50"
-                    title="Edit category"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteCategory(category.id)}
-                    className="text-red-600 hover:text-red-800 transition-colors p-1 rounded-md hover:bg-red-50"
-                    title="Delete category"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h3>
-              
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <div 
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: category.color }}
-                ></div>
-                <span>{category.color}</span>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-500">
-                  Created {new Date(category.created_at).toLocaleDateString()}
-                </p>
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === pagination.totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       <CategoryModal

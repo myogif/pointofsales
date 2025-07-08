@@ -25,7 +25,10 @@ export const createSale = async (req, res) => {
       .select()
       .single();
 
-    if (saleError) throw saleError;
+    if (saleError) {
+      console.error('Error creating sale record:', saleError);
+      throw saleError;
+    }
 
     // Create sale details
     const saleDetails = items.map(item => ({
@@ -45,15 +48,14 @@ export const createSale = async (req, res) => {
 
     // Update product stock
     for (const item of items) {
-      const { error: stockError } = await supabase
-        .from('products')
-        .update({ 
-          stock: supabase.raw(`stock - ${item.quantity}`)
-        })
-        .eq('id', item.id);
+      const { error: stockError } = await supabase.rpc('update_product_stock', {
+        product_id_in: item.id,
+        quantity_in: item.quantity,
+      });
 
       if (stockError) {
         console.error('Error updating stock for product:', item.id, stockError);
+        // Continue to next item, but log the error
       }
     }
 
@@ -132,12 +134,10 @@ export const createCredit = async (req, res) => {
 
     // Update product stock
     for (const item of items) {
-      const { error: stockError } = await supabase
-        .from('products')
-        .update({ 
-          stock: supabase.raw(`stock - ${item.quantity}`)
-        })
-        .eq('id', item.id);
+      const { error: stockError } = await supabase.rpc('update_product_stock', {
+        product_id_in: item.id,
+        quantity_in: item.quantity,
+      });
 
       if (stockError) {
         console.error('Error updating stock for product:', item.id, stockError);
@@ -160,7 +160,7 @@ export const createCredit = async (req, res) => {
 
 export const getAllSales = async (req, res) => {
   try {
-    const { page = 1, limit = 50, status, payment_method } = req.query;
+    const { page = 1, limit = 50, status, payment_method, startDate, endDate } = req.query;
     const offset = (page - 1) * limit;
 
     let query = supabase
@@ -183,6 +183,14 @@ export const getAllSales = async (req, res) => {
 
     if (payment_method) {
       query = query.eq('payment_method', payment_method);
+    }
+
+    if (startDate) {
+      query = query.gte('created_at', new Date(startDate).toISOString());
+    }
+
+    if (endDate) {
+      query = query.lte('created_at', new Date(endDate).toISOString());
     }
 
     const { data: sales, error } = await query;

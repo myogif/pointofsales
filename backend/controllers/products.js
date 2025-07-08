@@ -2,8 +2,12 @@ import { supabase } from '../services/supabaseClient.js';
 
 export const getAllProducts = async (req, res) => {
   try {
-    const { category_id, search } = req.query;
-    
+    const { category_id, search, page = 1, limit = 10 } = req.query;
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
+
     let query = supabase
       .from('products')
       .select(`
@@ -13,7 +17,7 @@ export const getAllProducts = async (req, res) => {
           name,
           color
         )
-      `);
+      `, { count: 'exact' });
 
     if (category_id) {
       query = query.eq('category_id', category_id);
@@ -23,11 +27,21 @@ export const getAllProducts = async (req, res) => {
       query = query.or(`name.ilike.%${search}%,barcode.ilike.%${search}%`);
     }
 
-    const { data: products, error } = await query.order('created_at', { ascending: false });
+    const { data: products, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) throw error;
 
-    res.json(products);
+    res.json({
+      data: products,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: count,
+        totalPages: Math.ceil(count / limitNum),
+      },
+    });
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ error: 'Failed to fetch products' });
@@ -116,6 +130,15 @@ export const createProduct = async (req, res) => {
     res.status(201).json(product);
   } catch (error) {
     console.error('Error creating product:', error);
+    
+    // Handle duplicate barcode error
+    if (error.code === '23505' && error.details && error.details.includes('barcode')) {
+      return res.status(409).json({ 
+        error: 'Product with this barcode already exists',
+        code: 'DUPLICATE_BARCODE'
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to create product' });
   }
 };
@@ -148,6 +171,15 @@ export const updateProduct = async (req, res) => {
     res.json(product);
   } catch (error) {
     console.error('Error updating product:', error);
+    
+    // Handle duplicate barcode error
+    if (error.code === '23505' && error.details && error.details.includes('barcode')) {
+      return res.status(409).json({ 
+        error: 'Product with this barcode already exists',
+        code: 'DUPLICATE_BARCODE'
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to update product' });
   }
 };

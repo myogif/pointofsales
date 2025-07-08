@@ -2,22 +2,18 @@ import { supabase } from '../services/supabaseClient.js';
 
 export const getAllCredits = async (req, res) => {
   try {
-    const { status, page = 1, limit = 50 } = req.query;
-    const offset = (page - 1) * limit;
+    const { status } = req.query;
 
-    let query = supabase
-      .from('credits')
-      .select(`
-        *,
-        sales (
-          id,
-          total,
-          created_at,
-          users!sales_cashier_id_fkey (username)
-        )
-      `)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    let query = supabase.from('credits').select(`
+      *,
+      sales (
+        id,
+        total,
+        created_at,
+        customer_id,
+        users!sales_cashier_id_fkey (username)
+      )
+    `);
 
     if (status) {
       query = query.eq('status', status);
@@ -27,46 +23,101 @@ export const getAllCredits = async (req, res) => {
 
     if (error) throw error;
 
-    res.json(credits);
+    const customerCredits = {};
+    let totalAllCredits = 0;
+
+    for (const credit of credits) {
+      const customerId = credit.sales.customer_id;
+      if (!customerId) continue;
+
+      if (!customerCredits[customerId]) {
+        customerCredits[customerId] = {
+          customer_id: customerId,
+          customer_name: credit.customer_name,
+          total_owed: 0,
+          total_paid: 0,
+          credits: [],
+        };
+      }
+
+      customerCredits[customerId].total_owed += credit.amount_owed;
+      customerCredits[customerId].total_paid += credit.amount_paid || 0;
+      customerCredits[customerId].credits.push(credit);
+    }
+
+    const groupedCredits = Object.values(customerCredits);
+    totalAllCredits = groupedCredits.reduce((acc, curr) => acc + (curr.total_owed - curr.total_paid), 0);
+
+
+    res.json({
+      credits: groupedCredits,
+      totalAllCredits,
+    });
   } catch (error) {
     console.error('Error fetching credits:', error);
     res.status(500).json({ error: 'Failed to fetch credits' });
   }
 };
 
-export const markCreditAsPaid = async (req, res) => {
+export const makePayment = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const { data: credit, error } = await supabase
+    const { amount } = req.body;
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid payment amount' });
+    }
+
+    const { data: existingCredit, error: fetchError } = await supabase
+      .from('credits')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!existingCredit) {
+      return res.status(404).json({ error: 'Credit not found' });
+    }
+
+    const paymentAmount = parseFloat(amount);
+    const newAmountPaid = (existingCredit.amount_paid || 0) + paymentAmount;
+    const remainingBalance = existingCredit.amount_owed - newAmountPaid;
+
+    let newStatus = 'partially_paid';
+    let paidAt = null;
+
+    if (remainingBalance <= 0) {
+      newStatus = 'paid';
+      paidAt = new Date().toISOString();
+    }
+
+    const { data: updatedCredit, error: updateError } = await supabase
       .from('credits')
       .update({
-        status: 'paid',
-        paid_at: new Date().toISOString()
+        amount_paid: newAmountPaid,
+        status: newStatus,
+        paid_at: paidAt,
       })
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
-    if (!credit) {
-      return res.status(404).json({ error: 'Credit not found' });
+    if (newStatus === 'paid') {
+      await supabase
+        .from('sales')
+        .update({ status: 'completed' })
+        .eq('id', updatedCredit.sale_id);
     }
 
-    // Update the related sale status
-    await supabase
-      .from('sales')
-      .update({ status: 'completed' })
-      .eq('id', credit.sale_id);
-
     res.json({
-      message: 'Credit marked as paid',
-      credit
+      message: 'Payment successfully recorded',
+      credit: updatedCredit,
     });
   } catch (error) {
-    console.error('Error updating credit:', error);
-    res.status(500).json({ error: 'Failed to update credit' });
+    console.error('Error making payment:', error);
+    res.status(500).json({ error: 'Failed to make payment' });
   }
 };
 

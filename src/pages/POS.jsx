@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Filter } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import CartSidebar from '../components/CartSidebar';
 import { productsAPI, categoriesAPI } from '../services/api';
@@ -10,37 +10,54 @@ const POS = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchProducts = useCallback(async (page = 1, category = 'all', search = '') => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [productsResponse, categoriesResponse] = await Promise.all([
-        productsAPI.getAll(),
-        categoriesAPI.getAll()
-      ]);
-      
-      setProducts(productsResponse.data);
-      setCategories(categoriesResponse.data);
+      const params = {
+        page,
+        limit: 8, // Show fewer items on POS page
+        category_id: category === 'all' ? '' : category,
+        search,
+      };
+      const response = await productsAPI.getAll(params);
+      if (response && response.data) {
+        setProducts(response.data.data);
+        setPagination(response.data.pagination);
+      }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching products:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.barcode.includes(searchTerm);
-      const matchesCategory = selectedCategory === 'all' || product.category_id === selectedCategory;
-      
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, searchTerm, selectedCategory]);
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await categoriesAPI.getAll({ limit: 999 });
+      if (response && response.data && response.data.data) {
+        setCategories(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts(currentPage, selectedCategory, searchTerm);
+  }, [fetchProducts, currentPage, selectedCategory, searchTerm]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage > 0 && newPage <= pagination.totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
 
   if (loading) {
     return (
@@ -90,7 +107,7 @@ const POS = () => {
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto">
-            {filteredProducts.length === 0 ? (
+            {products.length === 0 && !loading ? (
               <div className="text-center py-12">
                 <div className="text-gray-400 mb-4">
                   <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -101,11 +118,36 @@ const POS = () => {
                 <p className="text-sm text-gray-500 mt-2">Try adjusting your search or filters</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredProducts.map(product => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {products.map(product => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+                {pagination && pagination.total > 0 && (
+                  <div className="flex items-center justify-between mt-6">
+                    <span className="text-sm text-gray-700">
+                      Page {pagination.page} of {pagination.totalPages}
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === pagination.totalPages}
+                        className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

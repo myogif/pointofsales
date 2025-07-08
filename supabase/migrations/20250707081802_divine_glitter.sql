@@ -77,7 +77,7 @@
 CREATE TYPE unit_type AS ENUM ('kg', 'pcs', 'bundle', 'liter');
 CREATE TYPE sale_status AS ENUM ('completed', 'pending', 'cancelled');
 CREATE TYPE payment_method AS ENUM ('cash', 'credit', 'card');
-CREATE TYPE credit_status AS ENUM ('pending', 'paid', 'overdue');
+CREATE TYPE credit_status AS ENUM ('pending', 'partially_paid', 'paid', 'overdue');
 CREATE TYPE user_role AS ENUM ('admin', 'cashier');
 
 -- Categories table
@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS credits (
   sale_id uuid REFERENCES sales(id),
   customer_name text NOT NULL,
   amount_owed decimal(10,2) NOT NULL,
+  amount_paid decimal(10,2) DEFAULT 0,
   status credit_status DEFAULT 'pending',
   due_date date DEFAULT (CURRENT_DATE + INTERVAL '30 days'),
   paid_at timestamptz,
@@ -204,4 +205,4 @@ INSERT INTO products (name, barcode, description, price_liter, stock, category_i
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (username, email, password_hash, role) VALUES
-  ('admin', 'admin@veggiestore.com', '$2b$10$rOzJqQZQZQZQZQZQZQZQZOzJqQZQZQZQZQZQZQZQZOzJqQZQZQZQZQ', 'admin');
+  ('admin', 'admin@veggiestore.com', '$2a$10$iMTSaXT4zI.xVNVjWmpmEO3ounHqYjepvLSpGbQLIvqVWOnrZPNNG', 'admin');

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Edit, Trash2, Package, Filter, RefreshCw } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, Filter, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { productsAPI, categoriesAPI } from '../services/api';
 import { formatPrice } from '../utils/priceFormatter';
 import ProductModal from '../components/ProductModal';
@@ -15,18 +15,24 @@ const Products = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch products from API
-  const fetchProducts = useCallback(async (showLoading = true) => {
+  const fetchProducts = useCallback(async (page = 1, category = 'all', search = '') => {
+    setLoading(true);
+    setError(null);
     try {
-      if (showLoading) setLoading(true);
-      setError(null);
-      
-      const response = await productsAPI.getAll();
-      
-      // Ensure we're getting fresh data from API
+      const params = {
+        page,
+        limit: 10,
+        category_id: category === 'all' ? '' : category,
+        search,
+      };
+      const response = await productsAPI.getAll(params);
       if (response && response.data) {
-        setProducts(response.data);
+        setProducts(response.data.data);
+        setPagination(response.data.pagination);
       } else {
         throw new Error('Invalid response format from products API');
       }
@@ -34,19 +40,21 @@ const Products = () => {
       console.error('Error fetching products:', error);
       setError('Failed to fetch products from server');
       toast.error('Failed to fetch products');
-      setProducts([]); // Clear products on error
+      setProducts([]);
+      setPagination(null);
     } finally {
-      if (showLoading) setLoading(false);
+      setLoading(false);
     }
   }, []);
 
   // Fetch categories from API
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await categoriesAPI.getAll();
+      // Fetch all categories for the dropdown, not just a paginated list
+      const response = await categoriesAPI.getAll({ limit: 999 });
       
-      if (response && response.data) {
-        setCategories(response.data);
+      if (response && response.data && response.data.data) {
+        setCategories(response.data.data);
       } else {
         throw new Error('Invalid response format from categories API');
       }
@@ -57,55 +65,26 @@ const Products = () => {
     }
   }, []);
 
-  // Fetch all data
-  const fetchData = useCallback(async (showLoading = true) => {
-    try {
-      if (showLoading) setLoading(true);
-      setError(null);
-      
-      // Fetch both products and categories in parallel
-      await Promise.all([
-        fetchProducts(false),
-        fetchCategories()
-      ]);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      setError('Failed to fetch data from server');
-    } finally {
-      if (showLoading) setLoading(false);
-    }
-  }, [fetchProducts, fetchCategories]);
+  // Initial data fetch
+  useEffect(() => {
+    fetchProducts(currentPage, selectedCategory, searchTerm);
+  }, [fetchProducts, currentPage, selectedCategory, searchTerm]);
 
-  // Manual refresh function
-  const handleRefresh = async () => {
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const handleRefresh = () => {
     setRefreshing(true);
-    await fetchData(false);
-    setRefreshing(false);
+    fetchProducts(currentPage, selectedCategory, searchTerm).finally(() => setRefreshing(false));
     toast.success('Data refreshed successfully');
   };
 
-  // Initial data fetch
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Auto-refresh every 30 seconds to keep data live
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchProducts(false); // Refresh products silently
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [fetchProducts]);
-
-  // Filter products based on search and category
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.barcode.includes(searchTerm);
-    const matchesCategory = selectedCategory === 'all' || product.category_id === selectedCategory;
-    
-    return matchesSearch && matchesCategory;
-  });
+  const handlePageChange = (newPage) => {
+    if (newPage > 0 && newPage <= pagination.totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
 
   const getCategoryName = (categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
@@ -313,19 +292,19 @@ const Products = () => {
         </div>
       </div>
 
-      {filteredProducts.length === 0 ? (
+      {products.length === 0 && !loading ? (
         <div className="text-center py-12">
           <div className="text-gray-400 mb-4">
             <Package className="w-16 h-16 mx-auto" />
           </div>
           <p className="text-gray-600 mb-4">
-            {searchTerm || selectedCategory !== 'all' 
-              ? 'No products found matching your criteria' 
+            {searchTerm || selectedCategory !== 'all'
+              ? 'No products found matching your criteria'
               : 'No products found in database'
             }
           </p>
           {!searchTerm && selectedCategory === 'all' && (
-            <button 
+            <button
               onClick={handleAddProduct}
               className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 mx-auto"
             >
@@ -349,12 +328,12 @@ const Products = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredProducts.map(product => (
+                {products.map(product => (
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-3">
-                        <img 
-                          src={product.image_url || 'https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg?auto=compress&cs=tinysrgb&w=400'} 
+                        <img
+                          src={product.image_url || 'https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg?auto=compress&cs=tinysrgb&w=400'}
                           alt={product.name}
                           className="w-12 h-12 object-cover rounded-lg"
                         />
@@ -365,7 +344,7 @@ const Products = () => {
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span 
+                      <span
                         className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white"
                         style={{ backgroundColor: getCategoryColor(product.category_id) }}
                       >
@@ -382,7 +361,7 @@ const Products = () => {
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
                         <span className={`text-sm font-medium ${
-                          product.stock <= 5 ? 'text-red-600' : 
+                          product.stock <= 5 ? 'text-red-600' :
                           product.stock <= 10 ? 'text-yellow-600' : 'text-green-600'
                         }`}>
                           {product.stock}
@@ -401,14 +380,14 @@ const Products = () => {
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
-                        <button 
+                        <button
                           onClick={() => handleEditProduct(product)}
                           className="text-blue-600 hover:text-blue-800 transition-colors p-1 rounded-md hover:bg-blue-50"
                           title="Edit product"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDeleteProduct(product.id)}
                           className="text-red-600 hover:text-red-800 transition-colors p-1 rounded-md hover:bg-red-50"
                           title="Delete product"
@@ -422,6 +401,29 @@ const Products = () => {
               </tbody>
             </table>
           </div>
+          {pagination && pagination.total > 0 && (
+            <div className="flex items-center justify-between p-4 border-t border-gray-200">
+              <span className="text-sm text-gray-700">
+                Page {pagination.page} of {pagination.totalPages} (Total: {pagination.total} items)
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === pagination.totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

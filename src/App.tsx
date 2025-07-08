@@ -15,6 +15,7 @@ import Credits from './pages/Credits';
 import Purchases from './pages/Purchases';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import Transactions from './pages/Transactions';
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
                 <Route path="purchases" element={<Purchases />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="credit" element={<Credits />} />
+                <Route path="transactions" element={<Transactions />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />
               </Route>

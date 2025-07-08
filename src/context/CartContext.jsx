@@ -35,14 +35,17 @@ const cartReducer = (state, action) => {
         )
       };
     
-    case 'UPDATE_QUANTITY':
+    case 'UPDATE_ITEM':
       return {
         ...state,
-        items: state.items.map(item =>
-          item.id === action.payload.id && item.selectedUnit === action.payload.selectedUnit
-            ? { ...item, quantity: action.payload.quantity, total: action.payload.quantity * item.price }
-            : item
-        )
+        items: state.items.map(item => {
+          if (item.id === action.payload.id && item.selectedUnit === action.payload.selectedUnit) {
+            const updatedItem = { ...item, ...action.payload.updates };
+            updatedItem.total = updatedItem.quantity * updatedItem.price;
+            return updatedItem;
+          }
+          return item;
+        })
       };
     
     case 'CLEAR_CART':
@@ -107,12 +110,12 @@ export const CartProvider = ({ children }) => {
     toast.success('Item removed from cart');
   };
 
-  const updateQuantity = (id, selectedUnit, quantity) => {
-    if (quantity <= 0) {
+  const updateItem = (id, selectedUnit, updates) => {
+    if (updates.quantity <= 0) {
       removeFromCart(id, selectedUnit);
       return;
     }
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { id, selectedUnit, quantity } });
+    dispatch({ type: 'UPDATE_ITEM', payload: { id, selectedUnit, updates } });
   };
 
   const clearCart = () => {
@@ -137,21 +140,22 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const saveAsCredit = async (customerName) => {
+  const saveAsCredit = async (customer) => {
     if (state.items.length === 0) {
       toast.error('Cart is empty');
       return;
     }
 
-    if (!customerName) {
-      toast.error('Customer name is required for credit');
+    if (!customer || !customer.id) {
+      toast.error('Customer ID is required for credit');
       return;
     }
 
     try {
       await salesAPI.createCredit({ 
         items: state.items, 
-        customer_name: customerName 
+        id: customer.id,
+        customer_name: customer.name
       });
       toast.success('Order saved as credit!');
       clearCart();
@@ -176,7 +180,7 @@ export const CartProvider = ({ children }) => {
       cart: state.items,
       addToCart,
       removeFromCart,
-      updateQuantity,
+      updateItem,
       clearCart,
       processPayment,
       saveAsCredit,

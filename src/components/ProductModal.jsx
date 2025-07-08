@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Save, Upload, Image as ImageIcon, Camera } from 'lucide-react';
 import { productsAPI, categoriesAPI, uploadAPI } from '../services/api';
 import { formatPrice } from '../utils/priceFormatter';
 import toast from 'react-hot-toast';
@@ -10,10 +10,8 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
     name: '',
     barcode: '',
     description: '',
-    price_kg: '',
-    price_ons: '',
-    price_pcs: '',
-    price_liter: '',
+    unit_type: 'pcs',
+    price: '',
     stock: '',
     category_id: '',
     image_url: ''
@@ -29,14 +27,14 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
 
   useEffect(() => {
     if (product) {
+      const unit = product.unit_type || 'pcs';
+      const price = product[`price_${unit}`] || '';
       setFormData({
         name: product.name || '',
         barcode: product.barcode || '',
         description: product.description || '',
-        price_kg: product.price_kg || '',
-        price_ons: product.price_ons || '',
-        price_pcs: product.price_pcs || '',
-        price_liter: product.price_liter || '',
+        unit_type: unit,
+        price: price,
         stock: product.stock || '',
         category_id: product.category_id || '',
         image_url: product.image_url || ''
@@ -47,10 +45,8 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
         name: '',
         barcode: '',
         description: '',
-        price_kg: '',
-        price_ons: '',
-        price_pcs: '',
-        price_liter: '',
+        unit_type: 'pcs',
+        price: '',
         stock: '',
         category_id: '',
         image_url: ''
@@ -61,8 +57,10 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
 
   const fetchCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll();
-      setCategories(response.data);
+      const response = await categoriesAPI.getAll({ limit: 999 });
+      if (response && response.data && response.data.data) {
+        setCategories(response.data.data);
+      }
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
@@ -120,25 +118,29 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
       return;
     }
 
-    // Validate that at least one price is set
-    const hasPrice = formData.price_kg || formData.price_ons || formData.price_pcs || formData.price_liter;
-    if (!hasPrice) {
-      toast.error('Please set at least one price');
+    if (!formData.price) {
+      toast.error('Please set a price');
       return;
     }
 
     try {
       setLoading(true);
       
-      // Convert string values to numbers where needed
       const productData = {
-        ...formData,
-        price_kg: formData.price_kg ? parseFloat(formData.price_kg) : null,
-        price_ons: formData.price_ons ? parseFloat(formData.price_ons) : null,
-        price_pcs: formData.price_pcs ? parseFloat(formData.price_pcs) : null,
-        price_liter: formData.price_liter ? parseFloat(formData.price_liter) : null,
-        stock: parseFloat(formData.stock) || 0
+        name: formData.name,
+        barcode: formData.barcode,
+        description: formData.description,
+        unit_type: formData.unit_type,
+        stock: parseFloat(formData.stock) || 0,
+        category_id: formData.category_id,
+        image_url: formData.image_url,
+        price_kg: null,
+        price_ons: null,
+        price_pcs: null,
+        price_liter: null,
       };
+      
+      productData[`price_${formData.unit_type}`] = parseFloat(formData.price);
       
       if (product) {
         // Update existing product
@@ -153,8 +155,15 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
       onSuccess();
       onClose();
     } catch (error) {
-      const message = error.response?.data?.error || 'Failed to save product';
-      toast.error(message);
+      console.error('Error saving product:', error);
+      
+      // Handle specific error cases
+      if (error.response?.status === 409 && error.response?.data?.code === 'DUPLICATE_BARCODE') {
+        toast.error(`Product with barcode "${formData.barcode}" already exists. Please use a different barcode.`);
+      } else {
+        const message = error.response?.data?.error || 'Failed to save product';
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -278,78 +287,45 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price per Kg
+                    Unit Type *
+                  </label>
+                  <select
+                    name="unit_type"
+                    value={formData.unit_type}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                    required
+                  >
+                    <option value="pcs">Pcs</option>
+                    <option value="kg">Kg</option>
+                    <option value="ons">Ons</option>
+                    <option value="liter">Liter</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price per {formData.unit_type} *
                   </label>
                   <input
                     type="number"
-                    name="price_kg"
-                    value={formData.price_kg}
+                    name="price"
+                    value={formData.price}
                     onChange={handleChange}
                     step="100"
                     min="0"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price per Ons
-                  </label>
-                  <input
-                    type="number"
-                    name="price_ons"
-                    value={formData.price_ons}
-                    onChange={handleChange}
-                    step="10"
-                    min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price per Pcs
-                  </label>
-                  <input
-                    type="number"
-                    name="price_pcs"
-                    value={formData.price_pcs}
-                    onChange={handleChange}
-                    step="100"
-                    min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price per Liter
-                  </label>
-                  <input
-                    type="number"
-                    name="price_liter"
-                    value={formData.price_liter}
-                    onChange={handleChange}
-                    step="100"
-                    min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="0"
+                    required
                   />
                 </div>
               </div>
 
               {/* Price Preview */}
-              {(formData.price_kg || formData.price_ons || formData.price_pcs || formData.price_liter) && (
+              {formData.price && (
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Price Preview:</h4>
                   <div className="text-sm space-y-1">
-                    {formData.price_kg && <div>{formatPrice(formData.price_kg)}/kg</div>}
-                    {formData.price_ons && <div>{formatPrice(formData.price_ons)}/ons</div>}
-                    {formData.price_pcs && <div>{formatPrice(formData.price_pcs)}/pcs</div>}
-                    {formData.price_liter && <div>{formatPrice(formData.price_liter)}/liter</div>}
+                    <div>{formatPrice(formData.price)}/{formData.unit_type}</div>
                   </div>
                 </div>
               )}
@@ -382,30 +358,48 @@ const ProductModal = ({ isOpen, onClose, product, onSuccess }) => {
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                     <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-600 mb-2">Upload product image</p>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      id="image-upload"
-                      disabled={imageUploading}
-                    />
-                    <label
-                      htmlFor="image-upload"
-                      className="inline-flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
-                    >
-                      {imageUploading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                          <span>Uploading...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>Choose Image</span>
-                        </>
-                      )}
-                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        id="image-upload-file"
+                        disabled={imageUploading}
+                      />
+                      <label
+                        htmlFor="image-upload-file"
+                        className="flex-1 inline-flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                      >
+                        {imageUploading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            <span>Choose</span>
+                          </>
+                        )}
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        id="image-upload-camera"
+                        disabled={imageUploading}
+                      />
+                      <label
+                        htmlFor="image-upload-camera"
+                        className="flex-1 inline-flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Camera</span>
+                      </label>
+                    </div>
                   </div>
                 )}
               </div>
