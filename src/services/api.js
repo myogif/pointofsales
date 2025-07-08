@@ -40,20 +40,26 @@ export const authAPI = {
 
 // Products API
 export const productsAPI = {
-  getAll: (params) => api.get('/products', { params }),
-  getById: (id) => api.get(`/products/${id}`),
-  getByBarcode: (barcode) => api.get(`/products/barcode/${barcode}`),
-  create: (productData) => api.post('/products', productData),
-  update: (id, productData) => api.put(`/products/${id}`, productData),
-  delete: (id) => api.delete(`/products/${id}`),
+  getAll: (params) => {
+    const { signal, ...restParams } = params || {};
+    return api.get('/products', { params: restParams, signal });
+  },
+  getById: (id, signal) => api.get(`/products/${id}`, { signal }),
+  getByBarcode: (barcode, signal) => api.get(`/products/barcode/${barcode}`, { signal }),
+  create: (productData, signal) => api.post('/products', productData, { signal }),
+  update: (id, productData, signal) => api.put(`/products/${id}`, productData, { signal }),
+  delete: (id, signal) => api.delete(`/products/${id}`, { signal }),
 };
 
 // Categories API
 export const categoriesAPI = {
-  getAll: () => api.get('/categories'),
-  create: (categoryData) => api.post('/categories', categoryData),
-  update: (id, categoryData) => api.put(`/categories/${id}`, categoryData),
-  delete: (id) => api.delete(`/categories/${id}`),
+  getAll: (params) => {
+    const { signal, ...restParams } = params || {};
+    return api.get('/categories', { params: restParams, signal });
+  },
+  create: (categoryData, signal) => api.post('/categories', categoryData, { signal }),
+  update: (id, categoryData, signal) => api.put(`/categories/${id}`, categoryData, { signal }),
+  delete: (id, signal) => api.delete(`/categories/${id}`, { signal }),
 };
 
 // Sales API
@@ -66,11 +72,29 @@ export const salesAPI = {
 
 // Credits API
 export const creditsAPI = {
+<<<<<<< Updated upstream
   getAll: (params) => api.get('/credits', { params }),
   getTotalOutstanding: () => api.get('/credits/total-outstanding'),
   getByCustomer: (customerName) => api.get(`/credits/customer/${encodeURIComponent(customerName)}`),
   getById: (id) => api.get(`/credits/${id}`),
   makePayment: (id, data) => api.post(`/credits/pay/${id}`, data)
+=======
+  getAll: (params) => {
+    const { signal, ...restParams } = params || {};
+    return api.get('/credits', { params: restParams, signal });
+  },
+  getTotalOutstanding: (params) => {
+    const { signal } = params || {};
+    return api.get('/credits/total-outstanding', { signal });
+  },
+  getByCustomer: (customerName, params) => {
+    const { signal, ...restParams } = params || {};
+    return api.get(`/credits/customer/${encodeURIComponent(customerName)}`, { params: restParams, signal });
+  },
+  getById: (id, signal) => api.get(`/credits/${id}`, { signal }),
+  makePayment: (id, data, signal) => api.post(`/credits/pay/${id}`, data, { signal }),
+  createCredit: (creditData, signal) => api.post('/sales/credit', creditData, { signal }),
+>>>>>>> Stashed changes
 };
 
 // Customers API

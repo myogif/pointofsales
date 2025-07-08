@@ -6,26 +6,33 @@ const CartContext = createContext();
 
 const cartReducer = (state, action) => {
   switch (action.type) {
-    case 'ADD_TO_CART':
-      const existingItem = state.items.find(item => 
-        item.id === action.payload.id && item.selectedUnit === action.payload.selectedUnit
-      );
+    case 'ADD_TO_CART': {
+      const { product, quantity, selectedUnit } = action.payload;
+      const existingItem = state.items.find(item => item.id === product.id && item.selectedUnit === selectedUnit);
       
       if (existingItem) {
         return {
           ...state,
           items: state.items.map(item =>
-            item.id === action.payload.id && item.selectedUnit === action.payload.selectedUnit
-              ? { ...item, quantity: item.quantity + action.payload.quantity, total: (item.quantity + action.payload.quantity) * item.price }
+            item.id === product.id && item.selectedUnit === selectedUnit
+              ? { ...item, quantity: item.quantity + quantity, total: (item.quantity + quantity) * item.price }
               : item
           )
         };
       }
       
-      return {
-        ...state,
-        items: [...state.items, action.payload]
+      const unitPrice = product[`price_${selectedUnit}`] || 0;
+      const newItem = {
+        id: product.id,
+        name: product.name,
+        price: unitPrice,
+        quantity,
+        selectedUnit,
+        total: unitPrice * quantity,
+        image_url: product.image_url,
       };
+      return { ...state, items: [...state.items, newItem] };
+    }
     
     case 'REMOVE_FROM_CART':
       return {
@@ -35,30 +42,26 @@ const cartReducer = (state, action) => {
         )
       };
     
-    case 'UPDATE_ITEM':
+    case 'UPDATE_ITEM': {
+      const { id, selectedUnit, updates } = action.payload;
       return {
         ...state,
         items: state.items.map(item => {
-          if (item.id === action.payload.id && item.selectedUnit === action.payload.selectedUnit) {
-            const updatedItem = { ...item, ...action.payload.updates };
+          if (item.id === id && item.selectedUnit === selectedUnit) {
+            const updatedItem = { ...item, ...updates };
             updatedItem.total = updatedItem.quantity * updatedItem.price;
             return updatedItem;
           }
           return item;
         })
       };
+    }
     
     case 'CLEAR_CART':
-      return {
-        ...state,
-        items: []
-      };
+      return { ...state, items: [] };
     
     case 'LOAD_CART':
-      return {
-        ...state,
-        items: action.payload
-      };
+      return { ...state, items: action.payload };
     
     default:
       return state;
@@ -69,53 +72,32 @@ export const CartProvider = ({ children }) => {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
 
   useEffect(() => {
-    const savedCart = localStorage.getItem('vegetable-pos-cart');
+    const savedCart = localStorage.getItem('pos-cart');
     if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        dispatch({ type: 'LOAD_CART', payload: parsedCart });
-      } catch (error) {
-        console.error('Error loading cart from localStorage:', error);
-      }
+      dispatch({ type: 'LOAD_CART', payload: JSON.parse(savedCart) });
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('vegetable-pos-cart', JSON.stringify(state.items));
+    localStorage.setItem('pos-cart', JSON.stringify(state.items));
   }, [state.items]);
 
   const addToCart = (product, quantity, selectedUnit) => {
-    if (quantity <= 0) {
-      toast.error('Please enter a valid quantity');
-      return;
-    }
-
-    const unitPrice = product[`price_${selectedUnit}`];
-    const cartItem = {
-      id: product.id,
-      name: product.name,
-      price: unitPrice,
-      quantity: quantity,
-      selectedUnit: selectedUnit,
-      total: unitPrice * quantity,
-      image_url: product.image_url
-    };
-
-    dispatch({ type: 'ADD_TO_CART', payload: cartItem });
+    dispatch({ type: 'ADD_TO_CART', payload: { product, quantity, selectedUnit } });
     toast.success(`${product.name} added to cart`);
   };
 
   const removeFromCart = (id, selectedUnit) => {
     dispatch({ type: 'REMOVE_FROM_CART', payload: { id, selectedUnit } });
-    toast.success('Item removed from cart');
+    toast.error('Item removed from cart');
   };
 
   const updateItem = (id, selectedUnit, updates) => {
     if (updates.quantity <= 0) {
       removeFromCart(id, selectedUnit);
-      return;
+    } else {
+      dispatch({ type: 'UPDATE_ITEM', payload: { id, selectedUnit, updates } });
     }
-    dispatch({ type: 'UPDATE_ITEM', payload: { id, selectedUnit, updates } });
   };
 
   const clearCart = () => {
@@ -125,17 +107,14 @@ export const CartProvider = ({ children }) => {
   const processPayment = async () => {
     if (state.items.length === 0) {
       toast.error('Cart is empty');
-      return;
+      return false;
     }
-
     try {
       await salesAPI.create({ items: state.items });
-      toast.success('Payment processed successfully!');
       clearCart();
       return true;
     } catch (error) {
-      const message = error.response?.data?.error || 'Payment failed';
-      toast.error(message);
+      console.error('Payment failed:', error);
       return false;
     }
   };
@@ -143,36 +122,20 @@ export const CartProvider = ({ children }) => {
   const saveAsCredit = async (customer) => {
     if (state.items.length === 0) {
       toast.error('Cart is empty');
-      return;
+      return false;
     }
-
-    if (!customer || !customer.id) {
-      toast.error('Customer ID is required for credit');
-      return;
-    }
-
     try {
-      await salesAPI.createCredit({ 
-        items: state.items, 
-        id: customer.id,
-        customer_name: customer.name
-      });
-      toast.success('Order saved as credit!');
+      await salesAPI.createCredit({ items: state.items, customer_id: customer.id });
       clearCart();
       return true;
     } catch (error) {
-      const message = error.response?.data?.error || 'Failed to save credit';
-      toast.error(message);
+      console.error('Failed to save as credit:', error);
       return false;
     }
   };
 
   const getCartTotal = () => {
     return state.items.reduce((total, item) => total + item.total, 0);
-  };
-
-  const getCartItemCount = () => {
-    return state.items.reduce((count, item) => count + item.quantity, 0);
   };
 
   return (
@@ -185,7 +148,6 @@ export const CartProvider = ({ children }) => {
       processPayment,
       saveAsCredit,
       getCartTotal,
-      getCartItemCount
     }}>
       {children}
     </CartContext.Provider>

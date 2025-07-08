@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Menu, Camera, X } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
 import ProductCard from '../components/ProductCard';
 import CartSidebar from '../components/CartSidebar';
+import BarcodeScanner from '../components/BarcodeScanner';
 import { productsAPI, categoriesAPI } from '../services/api';
+import { useSidebar } from '../context/SidebarContext';
+import useCartStore from '../store/cartStore';
+import toast from 'react-hot-toast';
 
 const POS = () => {
+  const { isCollapsed, toggleSidebar } = useSidebar();
+  const addToCart = useCartStore((state) => state.addToCart);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [products, setProducts] = useState([]);
@@ -16,32 +24,15 @@ const POS = () => {
   const fetchProducts = useCallback(async (page = 1, category = 'all', search = '') => {
     setLoading(true);
     try {
-      const params = {
-        page,
-        limit: 8, // Show fewer items on POS page
-        category_id: category === 'all' ? '' : category,
-        search,
-      };
+      const params = { page, limit: 12, category_id: category === 'all' ? '' : category, search };
       const response = await productsAPI.getAll(params);
-      if (response && response.data) {
-        setProducts(response.data.data);
-        setPagination(response.data.pagination);
-      }
+      setProducts(response.data.data);
+      setPagination(response.data.pagination);
     } catch (error) {
       console.error('Error fetching products:', error);
+      toast.error('Failed to fetch products.');
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      const response = await categoriesAPI.getAll({ limit: 999 });
-      if (response && response.data && response.data.data) {
-        setCategories(response.data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error);
     }
   }, []);
 
@@ -50,8 +41,16 @@ const POS = () => {
   }, [fetchProducts, currentPage, selectedCategory, searchTerm]);
 
   useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoriesAPI.getAll({ limit: 50 });
+        setCategories([{ id: 'all', name: 'All' }, ...response.data.data]);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
     fetchCategories();
-  }, [fetchCategories]);
+  }, []);
 
   const handlePageChange = (newPage) => {
     if (newPage > 0 && newPage <= pagination.totalPages) {
@@ -59,101 +58,148 @@ const POS = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600"></div>
-      </div>
-    );
-  }
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    setCurrentPage(1);
+    fetchProducts(1, selectedCategory, searchTerm);
+  };
+
+  const handleBarcodeScan = async (barcode) => {
+    setIsScannerOpen(false);
+    try {
+      const response = await productsAPI.getAll({ search: barcode, limit: 1 });
+      const product = response.data.data[0];
+      if (product) {
+        addToCart(product);
+      } else {
+        toast.error('Product not found!');
+      }
+    } catch (error) {
+      console.error('Error finding product by barcode:', error);
+      toast.error('Error finding product.');
+    }
+  };
 
   return (
-    <div className="flex h-full">
-      <div className="flex-1 flex flex-col">
-        <div className="bg-white shadow-sm border-b border-gray-200 p-6">
-          <div className="max-w-7xl mx-auto">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Point of Sale</h1>
-            
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search products by name or barcode..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Filter className="w-5 h-5 text-gray-400" />
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
-                >
-                  <option value="all">All Categories</option>
-                  {categories.map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+    <div className="flex h-screen bg-gray-100 font-sans">
+      <Sidebar />
+      <div className="flex-1 flex flex-col h-screen">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <button onClick={toggleSidebar} className="text-gray-500 mr-4 lg:hidden">
+                <Menu className="w-6 h-6" />
+              </button>
+              <h1 className="text-xl font-bold text-gray-800">Point of Sale</h1>
             </div>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
-            {products.length === 0 && !loading ? (
-              <div className="text-center py-12">
-                <div className="text-gray-400 mb-4">
-                  <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+            <div className="flex-1 max-w-lg mx-6">
+              <form onSubmit={handleSearchSubmit}>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-12 pr-4 py-2.5 text-sm border border-gray-200 bg-gray-50 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
-                <p className="text-gray-600">No products found</p>
-                <p className="text-sm text-gray-500 mt-2">Try adjusting your search or filters</p>
+              </form>
+            </div>
+            <p className="text-sm text-gray-500">Toko Kelontong Bahagia</p>
+          </div>
+        </header>
+
+        <div className="flex-1 flex overflow-hidden">
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col overflow-y-auto">
+            {/* Categories */}
+            <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
+              <div className="px-6 py-3">
+                <div className="flex space-x-2">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                        setCurrentPage(1);
+                      }}
+                      className={`px-4 py-2 text-sm font-semibold rounded-full whitespace-nowrap transition-colors ${
+                        selectedCategory === cat.id
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:bg-blue-100'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {products.map(product => (
+            </nav>
+
+            {/* Product Grid */}
+            <main className="flex-1 p-6">
+              {loading ? (
+                <div className="flex justify-center items-center h-full">
+                  <div className="animate-spin rounded-full h-24 w-24 border-t-2 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                  <div
+                    className="bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center text-center p-4 cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => setIsScannerOpen(true)}
+                  >
+                    <Camera className="w-10 h-10 text-blue-500 mb-2" />
+                    <h3 className="font-semibold text-sm text-blue-800">Scan Barcode</h3>
+                  </div>
+                  {products.map((product) => (
                     <ProductCard key={product.id} product={product} />
                   ))}
                 </div>
-                {pagination && pagination.total > 0 && (
-                  <div className="flex items-center justify-between mt-6">
-                    <span className="text-sm text-gray-700">
-                      Page {pagination.page} of {pagination.totalPages}
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === pagination.totalPages}
-                        className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+              )}
+
+              {pagination && products.length > 0 && (
+                <div className="flex items-center justify-center mt-8">
+                  <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 mx-1 rounded-md bg-white border border-gray-300 disabled:opacity-50">
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <span className="text-sm text-gray-700 mx-4">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </span>
+                  <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === pagination.totalPages} className="p-2 mx-1 rounded-md bg-white border border-gray-300 disabled:opacity-50">
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+            </main>
+          </div>
+
+          {/* Cart Sidebar */}
+          <div className="w-full md:w-[400px] bg-white border-l border-gray-200 flex flex-col">
+            <CartSidebar />
           </div>
         </div>
       </div>
-      
-      <CartSidebar />
+
+      {isScannerOpen && (
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+          <div className="w-full max-w-2xl h-full md:h-auto md:max-h-[80vh] bg-white rounded-lg shadow-xl flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h2 className="text-lg font-semibold">Scan Barcode</h2>
+              <button onClick={() => setIsScannerOpen(false)} className="text-gray-500 hover:text-gray-800">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-grow p-4">
+              <BarcodeScanner
+                onScan={handleBarcodeScan}
+                onClose={() => setIsScannerOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

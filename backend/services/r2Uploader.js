@@ -14,8 +14,16 @@ const s3 = new AWS.S3({
 
 export const uploadToR2 = async (file, folder = 'products') => {
   try {
-    const fileExtension = file.originalname.split('.').pop();
-    const fileName = `${folder}/${uuidv4()}.${fileExtension}`;
+    const mimeTypeMap = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/svg+xml': 'svg',
+    };
+
+    const detectedExtension = mimeTypeMap[file.mimetype] || file.originalname.split('.').pop();
+    const fileName = `${folder}/${uuidv4()}.${detectedExtension}`;
     
     const uploadParams = {
       Bucket: process.env.R2_BUCKET_NAME,

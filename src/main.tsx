@@ -1,10 +1,21 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
 import './index.css';
+import { AuthProvider } from './context/AuthContext';
+import { SidebarProvider } from './context/SidebarContext';
+import { Toaster } from 'react-hot-toast';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <AuthProvider>
+        <SidebarProvider>
+          <App />
+          <Toaster position="top-center" reverseOrder={false} />
+        </SidebarProvider>
+      </AuthProvider>
+    </React.StrictMode>
+  );
+}

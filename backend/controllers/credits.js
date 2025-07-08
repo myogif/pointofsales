@@ -2,25 +2,42 @@ import { supabase } from '../services/supabaseClient.js';
 
 export const getAllCredits = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, type, search, page = 1, limit = 10 } = req.query;
+    const parsedPage = parseInt(page, 10);
+    const parsedLimit = parseInt(limit, 10);
+    const offset = (parsedPage - 1) * parsedLimit;
 
+<<<<<<< Updated upstream
     // Get all credits with calculated total_paid from credit_payments
     let query = supabase.from('credits').select(`
+=======
+    // Fetch all credits first to perform in-memory grouping and filtering
+    // This approach is necessary because Supabase's RLS and complex aggregations
+    // are often easier to handle in application logic for custom grouping.
+    let creditsQuery = supabase.from('credits').select(`
+>>>>>>> Stashed changes
       *,
       sales (
         id,
         total,
         created_at,
         customer_id,
-        users!sales_cashier_id_fkey (username)
+        users!sales_cashier_id_fkey (username),
+        sale_details (
+          *,
+          products (name, barcode, image_url)
+        )
       )
     `);
 
     if (status) {
-      query = query.eq('status', status);
+      creditsQuery = creditsQuery.eq('status', status);
+    }
+    if (type) {
+      creditsQuery = creditsQuery.eq('type', type);
     }
 
-    const { data: credits, error } = await query;
+    const { data: credits, error } = await creditsQuery;
 
     if (error) throw error;
 
@@ -59,26 +76,103 @@ export const getAllCredits = async (req, res) => {
     }
 
     // Calculate remaining and filter out customers with zero remaining
+<<<<<<< Updated upstream
     const filteredCustomers = Object.values(customerCredits)
+=======
+    let processedCustomers = Object.values(customerCredits)
+>>>>>>> Stashed changes
       .map(customer => ({
         ...customer,
         remaining: customer.total_owed - customer.total_paid
       }))
       .filter(customer => customer.remaining > 0);
 
+<<<<<<< Updated upstream
     res.json(filteredCustomers);
+=======
+    // Apply search filter
+    if (search) {
+      const searchTermLower = search.toLowerCase();
+      processedCustomers = processedCustomers.filter(customer =>
+        customer.customer_name.toLowerCase().includes(searchTermLower)
+      );
+    }
+
+    // Sort by customer name for consistent pagination
+    processedCustomers.sort((a, b) => a.customer_name.localeCompare(b.customer_name));
+
+    // Implement pagination
+    const totalItems = processedCustomers.length;
+    const totalPages = Math.ceil(totalItems / parsedLimit);
+    const paginatedCustomers = processedCustomers.slice(offset, offset + parsedLimit);
+
+    res.json({
+      data: paginatedCustomers,
+      pagination: {
+        total: totalItems,
+        page: parsedPage,
+        totalPages: totalPages,
+        limit: parsedLimit,
+      },
+    });
+>>>>>>> Stashed changes
   } catch (error) {
     console.error('Error fetching credits:', error);
     res.status(500).json({ error: 'Failed to fetch credits' });
   }
 };
 
+<<<<<<< Updated upstream
 export const getTotalOutstanding = async (req, res) => {
   try {
     // Get all credits
     const { data: credits, error } = await supabase
       .from('credits')
       .select('id, amount_owed');
+=======
+export const createCredit = async (req, res) => {
+  try {
+    const { customer_name, amount_owed, due_date, description, type } = req.body;
+
+    if (!customer_name || !amount_owed || isNaN(amount_owed) || amount_owed <= 0) {
+      return res.status(400).json({ error: 'Customer name and a valid amount owed are required.' });
+    }
+
+    const { data, error } = await supabase
+      .from('credits')
+      .insert([{
+        customer_name,
+        amount_owed: parseFloat(amount_owed),
+        due_date: due_date || null,
+        description: description || null,
+        type: type || 'general_credit'
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('Error creating credit:', error);
+    res.status(500).json({ error: 'Failed to create credit' });
+  }
+};
+
+export const getTotalOutstanding = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    let query = supabase
+      .from('credits')
+      .select('id, amount_owed, created_at');
+
+    if (startDate && endDate) {
+      query = query.gte('created_at', startDate).lte('created_at', endDate + 'T23:59:59.999Z');
+    }
+
+    const { data: credits, error } = await query;
+>>>>>>> Stashed changes
 
     if (error) throw error;
 
@@ -109,8 +203,14 @@ export const getTotalOutstanding = async (req, res) => {
 export const getCreditsByCustomer = async (req, res) => {
   try {
     const { customer_name } = req.params;
+<<<<<<< Updated upstream
     
     const { data: credits, error } = await supabase
+=======
+    const { type } = req.query; // Added type filter
+
+    let query = supabase
+>>>>>>> Stashed changes
       .from('credits')
       .select(`
         *,
@@ -123,8 +223,18 @@ export const getCreditsByCustomer = async (req, res) => {
           )
         )
       `)
+<<<<<<< Updated upstream
       .eq('customer_name', customer_name)
       .order('created_at', { ascending: false });
+=======
+      .eq('customer_name', customer_name);
+    
+    if (type) {
+      query = query.eq('type', type);
+    }
+
+    const { data: credits, error } = await query.order('created_at', { ascending: false });
+>>>>>>> Stashed changes
 
     if (error) throw error;
 
