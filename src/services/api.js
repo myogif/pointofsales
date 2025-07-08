@@ -66,9 +66,11 @@ export const salesAPI = {
 
 // Credits API
 export const creditsAPI = {
-  getAll: (params) => axios.get('/api/credits', { params }),
-  getById: (id) => axios.get(`/api/credits/${id}`),
-  makePayment: (id, data) => axios.post(`/api/credits/${id}/payment`, data)
+  getAll: (params) => api.get('/credits', { params }),
+  getTotalOutstanding: () => api.get('/credits/total-outstanding'),
+  getByCustomer: (customerName) => api.get(`/credits/customer/${encodeURIComponent(customerName)}`),
+  getById: (id) => api.get(`/credits/${id}`),
+  makePayment: (id, data) => api.post(`/credits/pay/${id}`, data)
 };
 
 // Customers API
