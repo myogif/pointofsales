@@ -9,16 +9,14 @@ const PaymentModal = ({ credit, onClose, onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const remainingAmount = credit.remaining || (credit.amount_owed - (credit.amount_paid || 0));
+  const paymentAmount = parseFloat(amount) || 0;
+  const newRemainingAmount = Math.max(0, remainingAmount - paymentAmount);
+  const isValidPayment = paymentAmount > 0 && paymentAmount <= remainingAmount;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const paymentAmount = parseFloat(amount);
-    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+    if (!isValidPayment) {
       toast.error('Please enter a valid payment amount.');
-      return;
-    }
-    if (paymentAmount > remainingAmount) {
-      toast.error(`Payment cannot exceed the remaining amount of ${formatPrice(remainingAmount)}.`);
       return;
     }
 
@@ -56,6 +54,29 @@ const PaymentModal = ({ credit, onClose, onSuccess }) => {
               <span className="text-gray-900 font-medium">Remaining:</span>
               <span className="font-bold text-red-600">{formatPrice(remainingAmount)}</span>
             </div>
+            {paymentAmount > 0 && (
+              <>
+                <div className="flex justify-between pt-2 border-t border-gray-200">
+                  <span className="text-gray-600">Payment Amount:</span>
+                  <span className={`font-medium ${isValidPayment ? 'text-blue-600' : 'text-red-600'}`}>
+                    -{formatPrice(paymentAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-900 font-medium">New Remaining:</span>
+                  <span className={`font-bold ${newRemainingAmount === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatPrice(newRemainingAmount)}
+                  </span>
+                </div>
+                {newRemainingAmount === 0 && (
+                  <div className="text-center mt-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      ✓ Credit will be fully paid
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
         <form onSubmit={handleSubmit}>
@@ -67,14 +88,47 @@ const PaymentModal = ({ credit, onClose, onSuccess }) => {
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${
+                  amount && !isValidPayment 
+                    ? 'border-red-300 focus:ring-red-500 bg-red-50' 
+                    : 'border-gray-300 focus:ring-green-500'
+                }`}
                 placeholder="Enter amount"
                 autoFocus
                 step="0.01"
                 max={remainingAmount}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">Maximum: {formatPrice(remainingAmount)}</p>
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-xs text-gray-500">Maximum: {formatPrice(remainingAmount)}</p>
+              {amount && !isValidPayment && (
+                <p className="text-xs text-red-600">Invalid amount</p>
+              )}
+            </div>
+            {/* Quick payment buttons */}
+            <div className="flex space-x-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setAmount((remainingAmount / 4).toString())}
+                className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                25%
+              </button>
+              <button
+                type="button"
+                onClick={() => setAmount((remainingAmount / 2).toString())}
+                className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                50%
+              </button>
+              <button
+                type="button"
+                onClick={() => setAmount(remainingAmount.toString())}
+                className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Full
+              </button>
+            </div>
           </div>
           <div className="flex space-x-3">
             <button
@@ -86,7 +140,7 @@ const PaymentModal = ({ credit, onClose, onSuccess }) => {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isValidPayment}
               className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors font-medium"
             >
               {isSubmitting ? 'Processing...' : 'Record Payment'}
